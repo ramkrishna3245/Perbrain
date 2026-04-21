@@ -1,0 +1,1506 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MindAI -- Browser-Native Reasoning Engine</title>
+<link rel="stylesheet" href="chatbot.css">
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-head">
+      <div class="logo">🧠</div>
+      <h1>MindAI</h1>
+    </div>
+    <button class="btn bp new-chat" onclick="newChat()">+ New Chat</button>
+    <div class="sb-section">
+      <div class="sb-label">Brain Stats</div>
+      <div class="stat-list">
+        <div class="stat-row"><span>📚 Topics learned</span><span id="stTopics">0</span></div>
+        <div class="stat-row"><span>📝 Sentences stored</span><span id="stSentences">0</span></div>
+        <div class="stat-row"><span>🔗 Concepts mapped</span><span id="stConcepts">0</span></div>
+        <div class="stat-row"><span>🧩 Relationships</span><span id="stRelations">0</span></div>
+        <div class="stat-row"><span>💡 Insights found</span><span id="stInsights">0</span></div>
+        <div class="stat-row"><span>💬 Messages</span><span id="stMessages">0</span></div>
+      </div>
+    </div>
+    <div class="sb-section">
+      <div class="sb-label">Actions</div>
+      <button class="btn bs sb-btn" onclick="exportBrain()">📤 Export Brain</button>
+      <button class="btn bs sb-btn" onclick="document.getElementById('importFile').click()">📥 Import Brain</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importBrain(this)">
+      <button class="btn bs sb-btn" onclick="toggleDebug()">🔧 Debug: <span id="debugLabel">OFF</span></button>
+      <button class="btn bd sb-btn" onclick="if(confirm('Erase all learned knowledge?')){localStorage.removeItem('mindai');location.reload()}">🗑️ Reset Brain</button>
+    </div>
+    <div class="sb-footer">
+      <p>100% browser-native</p>
+      <p>Zero servers. Zero APIs.</p>
+      <p>Your data stays on your device.</p>
+    </div>
+  </aside>
+
+  <div class="main">
+    <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+    <div class="chat-area" id="chatArea">
+      <div class="welcome" id="welcome">
+        <div class="welcome-icon">🧠</div>
+        <h2>MindAI</h2>
+        <p>I learn from the real internet -- Wikipedia, DuckDuckGo, Reddit, Hacker News and more.</p>
+        <p>I extract concepts, build knowledge graphs, reason about relationships, and discover insights.</p>
+        <p>Ask me anything. I'll fetch, learn, reason, and answer.</p>
+        <div class="welcome-examples">
+          <button class="example-btn" onclick="askExample(this)">What is artificial intelligence?</button>
+          <button class="example-btn" onclick="askExample(this)">Explain quantum computing</button>
+          <button class="example-btn" onclick="askExample(this)">What are the best programming languages in 2025?</button>
+          <button class="example-btn" onclick="askExample(this)">How does blockchain work?</button>
+        </div>
+      </div>
+      <div id="messages"></div>
+    </div>
+    <div class="input-area">
+      <div class="thinking" id="thinking" style="display:none">
+        <div class="dot-pulse"></div>
+        <span id="thinkText">Thinking...</span>
+      </div>
+      <div class="input-row">
+        <textarea id="userInput" placeholder="Ask me anything... I'll learn from the internet and reason about it" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <button class="send-btn" onclick="send()" id="sendBtn">➤</button>
+      </div>
+      <div class="input-footer">
+        <span>Fetches real data from Wikipedia, DuckDuckGo, Reddit & more -- no API keys needed</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="debugPanel" class="debug-panel" style="display:none">
+  <div class="debug-head">
+    <h3>🔧 Debug Console</h3>
+    <button onclick="document.getElementById('debugPanel').style.display='none'">✕</button>
+  </div>
+  <div class="debug-log" id="debugLog"></div>
+</div>
+
+<script src="chatbot.js"></script>
+</body>
+</html><style>/* ═══════════════════════════════════════
+   MindAI -- Complete Stylesheet
+   ═══════════════════════════════════════ */
+
+:root {
+  --bg1: #0a0a14;
+  --bg2: #111122;
+  --bg3: #1a1a2e;
+  --bg4: #252540;
+  --t1: #e2e8f0;
+  --t2: #8892b0;
+  --t3: #5a6178;
+  --ac: #6366f1;
+  --ac2: #818cf8;
+  --gn: #22c55e;
+  --or: #f59e0b;
+  --rd: #ef4444;
+  --br: #2a2a45;
+  --r: 10px;
+  --user-bg: #2a2a4a;
+  --ai-bg: #151528;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg1);
+  color: var(--t1);
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ─── APP LAYOUT ──────────────────────── */
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+/* ─── SIDEBAR ─────────────────────────── */
+.sidebar {
+  width: 260px;
+  background: var(--bg2);
+  border-right: 1px solid var(--br);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.sb-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--br);
+}
+
+.logo {
+  font-size: 28px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg4);
+  border-radius: 10px;
+}
+
+.sb-head h1 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.new-chat {
+  width: 100%;
+  margin-bottom: 16px;
+  justify-content: center;
+}
+
+.sb-section {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--br);
+}
+
+.sb-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--t3);
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.stat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--t2);
+  padding: 4px 0;
+}
+
+.stat-row span:last-child {
+  color: var(--t1);
+  font-weight: 600;
+}
+
+.sb-btn {
+  width: 100%;
+  margin-bottom: 6px;
+  justify-content: center;
+  font-size: 12px;
+  padding: 8px 12px;
+}
+
+.sb-footer {
+  margin-top: auto;
+  padding-top: 16px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--t3);
+  line-height: 1.6;
+}
+
+/* ─── MAIN ────────────────────────────── */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  position: relative;
+}
+
+/* ─── CHAT AREA ───────────────────────── */
+.chat-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-area::-webkit-scrollbar { width: 5px; }
+.chat-area::-webkit-scrollbar-thumb { background: var(--br); border-radius: 3px; }
+
+/* ─── WELCOME SCREEN ──────────────────── */
+.welcome {
+  text-align: center;
+  max-width: 600px;
+  margin: auto;
+  padding: 40px 20px;
+}
+
+.welcome-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.welcome h2 {
+  font-size: 28px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, var(--ac), #a855f7, var(--ac2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.welcome p {
+  color: var(--t2);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.welcome-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.example-btn {
+  padding: 10px 16px;
+  background: var(--bg3);
+  border: 1px solid var(--br);
+  border-radius: var(--r);
+  color: var(--t2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.example-btn:hover {
+  background: var(--bg4);
+  color: var(--t1);
+  border-color: var(--ac);
+}
+
+/* ─── MESSAGES ────────────────────────── */
+.message {
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto 20px;
+  animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.msg-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.msg-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.msg-avatar.user {
+  background: var(--ac);
+}
+
+.msg-avatar.ai {
+  background: var(--bg4);
+}
+
+.msg-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.msg-body {
+  padding: 16px 20px;
+  border-radius: var(--r);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.msg-body.user {
+  background: var(--user-bg);
+  border: 1px solid var(--br);
+}
+
+.msg-body.ai {
+  background: var(--ai-bg);
+  border: 1px solid var(--br);
+}
+
+.msg-body p {
+  margin-bottom: 10px;
+}
+
+.msg-body p:last-child {
+  margin-bottom: 0;
+}
+
+.msg-body ul, .msg-body ol {
+  margin: 8px 0 8px 20px;
+}
+
+.msg-body li {
+  margin-bottom: 4px;
+}
+
+.msg-body strong {
+  color: var(--ac2);
+}
+
+.msg-body code {
+  background: var(--bg4);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+/* ─── INSIGHTS BOX ────────────────────── */
+.insights-box {
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 8px;
+}
+
+.insights-box h4 {
+  font-size: 12px;
+  color: var(--ac2);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.insights-box li {
+  font-size: 13px;
+  color: var(--t2);
+  line-height: 1.5;
+}
+
+/* ─── CONNECTIONS BOX ─────────────────── */
+.connections-box {
+  margin-top: 8px;
+  padding: 12px 16px;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 8px;
+}
+
+.connections-box h4 {
+  font-size: 12px;
+  color: var(--gn);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.connections-box li {
+  font-size: 13px;
+  color: var(--t2);
+  line-height: 1.5;
+}
+
+/* ─── SOURCES BOX ─────────────────────── */
+.sources-box {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.source-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  background: var(--bg4);
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--t2);
+}
+
+/* ─── GRAPH STATS ─────────────────────── */
+.msg-meta {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--t3);
+  display: flex;
+  gap: 12px;
+}
+
+/* ─── THINKING INDICATOR ──────────────── */
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--t2);
+}
+
+.dot-pulse {
+  display: flex;
+  gap: 4px;
+}
+
+.dot-pulse::before,
+.dot-pulse::after,
+.dot-pulse span {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: var(--ac);
+  border-radius: 50%;
+  animation: pulse 1.2s infinite;
+}
+
+.dot-pulse::after { animation-delay: 0.2s; }
+.dot-pulse span { animation-delay: 0.4s; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+/* ─── INPUT AREA ──────────────────────── */
+.input-area {
+  padding: 12px 24px 16px;
+  border-top: 1px solid var(--br);
+  background: var(--bg2);
+}
+
+.input-row {
+  display: flex;
+  gap: 8px;
+  max-width: 800px;
+  margin: 0 auto;
+  align-items: flex-end;
+}
+
+#userInput {
+  flex: 1;
+  padding: 12px 16px;
+  background: var(--bg3);
+  border: 1px solid var(--br);
+  border-radius: var(--r);
+  color: var(--t1);
+  font-size: 14px;
+  font-family: inherit;
+  resize: none;
+  max-height: 150px;
+  line-height: 1.5;
+  transition: border 0.2s;
+}
+
+#userInput:focus {
+  outline: none;
+  border-color: var(--ac);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+#userInput::placeholder {
+  color: var(--t3);
+}
+
+.send-btn {
+  width: 44px;
+  height: 44px;
+  background: var(--ac);
+  border: none;
+  border-radius: var(--r);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.send-btn:hover { background: var(--ac2); }
+.send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.input-footer {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--t3);
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ─── BUTTONS ─────────────────────────── */
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.bp { background: var(--ac); color: #fff; }
+.bp:hover { background: var(--ac2); }
+
+.bs { background: var(--bg3); color: var(--t1); border: 1px solid var(--br); }
+.bs:hover { background: var(--bg4); }
+
+.bd { background: rgba(239, 68, 68, 0.15); color: var(--rd); border: 1px solid rgba(239, 68, 68, 0.3); }
+.bd:hover { background: rgba(239, 68, 68, 0.25); }
+
+/* ─── DEBUG PANEL ─────────────────────── */
+.debug-panel {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 420px;
+  max-height: 50vh;
+  background: var(--bg2);
+  border: 1px solid var(--br);
+  border-radius: 12px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  box-shadow: -4px -4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.debug-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--br);
+}
+
+.debug-head h3 {
+  font-size: 13px;
+}
+
+.debug-head button {
+  background: none;
+  border: none;
+  color: var(--t2);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.debug-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.debug-log::-webkit-scrollbar { width: 4px; }
+.debug-log::-webkit-scrollbar-thumb { background: var(--br); border-radius: 2px; }
+
+.dlog {
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(42, 42, 69, 0.5);
+}
+
+.dlog.info { color: var(--ac2); }
+.dlog.success { color: var(--gn); }
+.dlog.warn { color: var(--or); }
+.dlog.error { color: var(--rd); }
+.dlog.data { color: var(--t2); }
+
+/* ─── MENU TOGGLE ─────────────────────── */
+.menu-toggle {
+  display: none;
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 99;
+  padding: 8px 12px;
+  background: var(--bg2);
+  border: 1px solid var(--br);
+  border-radius: 8px;
+  color: var(--t1);
+  cursor: pointer;
+  font-size: 18px;
+}
+
+/* ─── ERROR MESSAGE ───────────────────── */
+.error-msg {
+  color: var(--rd);
+  font-size: 13px;
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 6px;
+  margin-top: 8px;
+}
+
+/* ─── LOADING DOTS IN MESSAGE ─────────── */
+.loading-dots {
+  display: inline-flex;
+  gap: 4px;
+  padding: 8px 0;
+}
+
+.loading-dots span {
+  width: 8px;
+  height: 8px;
+  background: var(--t3);
+  border-radius: 50%;
+  animation: ldot 1.2s infinite;
+}
+
+.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes ldot {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+/* ─── RESPONSIVE ──────────────────────── */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.3s;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .menu-toggle {
+    display: block;
+  }
+
+  .main {
+    width: 100%;
+  }
+
+  .chat-area {
+    padding: 16px;
+    padding-top: 52px;
+  }
+
+  .input-area {
+    padding: 10px 16px 14px;
+  }
+
+  .welcome-examples {
+    flex-direction: column;
+  }
+
+  .debug-panel {
+    width: 100%;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .message {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .welcome h2 { font-size: 22px; }
+  .welcome-icon { font-size: 48px; }
+}
+
+/* ─── PRINT ───────────────────────────── */
+@media print {
+  .sidebar, .input-area, .menu-toggle, .debug-panel, .thinking {
+    display: none !important;
+  }
+  .main { width: 100%; }
+  body { background: #fff; color: #000; }
+  .msg-body { border: 1px solid #ccc; }
+  .msg-body.ai, .msg-body.user { background: #f9f9f9; }
+}</style><script>// ============================================================================
+// SEOEngine - Complete Browser-Based SEO Tool
+// All logic runs in the browser. Zero servers. Zero APIs (except where noted).
+// ============================================================================
+
+class SEOEngine {
+  constructor() {
+    this.state = {
+      currentTab: 'home',
+      keywords: [],
+      articles: [],
+      competitors: [],
+      license: this.loadLicense(),
+      backups: [],
+    };
+    this.init();
+  }
+
+  // =========================================================================
+  // INITIALIZATION
+  // =========================================================================
+  init() {
+    this.loadState();
+    this.setupDOM();
+    this.setupEventListeners();
+    this.render();
+  }
+
+  setupDOM() {
+    // Check if DOM already exists, don't re-create
+    if (document.querySelector('#app-container')) return;
+
+    const html = `
+      <div id="app-container">
+        <header class="app-header">
+          <div class="logo">SEOEngine</div>
+          <nav class="main-nav">
+            <button data-tab="home" class="nav-btn active">🏠 Home</button>
+            <button data-tab="keywords" class="nav-btn">🔍 Keywords</button>
+            <button data-tab="analyzer" class="nav-btn">📊 Analyzer</button>
+            <button data-tab="generator" class="nav-btn">✍️ Generator</button>
+            <button data-tab="competitors" class="nav-btn">👁️ Competitors</button>
+            <button data-tab="schema" class="nav-btn">⚙️ Schema</button>
+            <button data-tab="settings" class="nav-btn">⚙️ Settings</button>
+          </nav>
+        </header>
+
+        <main class="app-main">
+          <!-- HOME TAB -->
+          <section id="home-tab" class="tab-content active">
+            <h1>Welcome to SEOEngine</h1>
+            <div class="card">
+              <h2>Everything Runs in Your Browser</h2>
+              <p>✅ No login required</p>
+              <p>✅ All data stays on your device</p>
+              <p>✅ Zero API calls</p>
+              <p>✅ Free forever</p>
+              <hr>
+              <h3>What You Can Do:</h3>
+              <ul>
+                <li><strong>🔍 Keyword Research</strong> - Find keywords with Google Autocomplete data</li>
+                <li><strong>📊 On-Page Analysis</strong> - Analyze any URL for SEO</li>
+                <li><strong>✍️ Article Generator</strong> - AI-powered (WebLLM) article writing</li>
+                <li><strong>👁️ Competitor Spy</strong> - Analyze competitor URLs</li>
+                <li><strong>⚙️ Schema Generator</strong> - Auto-generate JSON-LD schema</li>
+                <li><strong>💾 Export/Backup</strong> - Download everything as JSON</li>
+              </ul>
+            </div>
+          </section>
+
+          <!-- KEYWORDS TAB -->
+          <section id="keywords-tab" class="tab-content">
+            <h1>Keyword Research</h1>
+            <div class="card">
+              <h3>Find Keywords (Google Autocomplete)</h3>
+              <input type="text" id="keyword-input" placeholder="Enter seed keyword (e.g., 'best crm')" class="input-field">
+              <button id="research-btn" class="btn btn-primary">🔍 Research Keywords</button>
+              <div id="keyword-results" class="results"></div>
+            </div>
+            <div class="card">
+              <h3>Your Keyword List</h3>
+              <div id="keywords-list" class="keywords-list"></div>
+            </div>
+          </section>
+
+          <!-- ANALYZER TAB -->
+          <section id="analyzer-tab" class="tab-content">
+            <h1>On-Page SEO Analyzer</h1>
+            <div class="card">
+              <h3>Analyze a Page (URL or HTML)</h3>
+              <div class="form-group">
+                <label>URL or paste HTML:</label>
+                <textarea id="analyze-input" placeholder="Paste full page HTML or enter URL..." class="textarea-field"></textarea>
+              </div>
+              <button id="analyze-btn" class="btn btn-primary">📊 Analyze</button>
+              <div id="analysis-results" class="results"></div>
+            </div>
+          </section>
+
+          <!-- GENERATOR TAB -->
+          <section id="generator-tab" class="tab-content">
+            <h1>AI Article Generator</h1>
+            <div class="card">
+              <h3>Generate SEO-Optimized Content</h3>
+              <div class="form-group">
+                <label>Topic/Keyword:</label>
+                <input type="text" id="article-topic" placeholder="e.g., best project management tools" class="input-field">
+              </div>
+              <div class="form-group">
+                <label>Word Count:</label>
+                <select id="article-length" class="input-field">
+                  <option value="500">500 words</option>
+                  <option value="1000" selected>1000 words</option>
+                  <option value="1500">1500 words</option>
+                  <option value="2000">2000 words</option>
+                </select>
+              </div>
+              <button id="generate-article-btn" class="btn btn-primary">✍️ Generate Article</button>
+              <div id="article-output" class="results"></div>
+            </div>
+          </section>
+
+          <!-- COMPETITORS TAB -->
+          <section id="competitors-tab" class="tab-content">
+            <h1>Competitor Analysis</h1>
+            <div class="card">
+              <h3>Analyze Competitor URLs</h3>
+              <div class="form-group">
+                <label>Competitor URL:</label>
+                <input type="text" id="competitor-url" placeholder="https://example.com/article" class="input-field">
+              </div>
+              <button id="analyze-competitor-btn" class="btn btn-primary">👁️ Analyze</button>
+              <div id="competitor-results" class="results"></div>
+            </div>
+          </section>
+
+          <!-- SCHEMA TAB -->
+          <section id="schema-tab" class="tab-content">
+            <h1>JSON-LD Schema Generator</h1>
+            <div class="card">
+              <h3>Generate Schema for Your Page</h3>
+              <div class="form-group">
+                <label>Schema Type:</label>
+                <select id="schema-type" class="input-field">
+                  <option value="article">Article</option>
+                  <option value="product">Product</option>
+                  <option value="faq">FAQ</option>
+                  <option value="organization">Organization</option>
+                  <option value="review">Review</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Title:</label>
+                <input type="text" id="schema-title" placeholder="Page title" class="input-field">
+              </div>
+              <div class="form-group">
+                <label>Description:</label>
+                <textarea id="schema-desc" placeholder="Page description" class="textarea-field"></textarea>
+              </div>
+              <button id="generate-schema-btn" class="btn btn-primary">⚙️ Generate Schema</button>
+              <div id="schema-output" class="results"></div>
+            </div>
+          </section>
+
+          <!-- SETTINGS TAB -->
+          <section id="settings-tab" class="tab-content">
+            <h1>Settings & License</h1>
+            <div class="card">
+              <h3>License Status</h3>
+              <p id="license-status">Checking license...</p>
+              <button id="activate-license-btn" class="btn btn-primary">🔓 Activate License</button>
+              <input type="text" id="license-key" placeholder="Paste license key" class="input-field" style="display:none;">
+              <button id="submit-license-btn" class="btn btn-primary" style="display:none;">✅ Submit License</button>
+            </div>
+            <div class="card">
+              <h3>Data Management</h3>
+              <button id="export-data-btn" class="btn btn-secondary">💾 Export All Data</button>
+              <button id="create-backup-btn" class="btn btn-secondary">📦 Create Backup</button>
+              <button id="restore-backup-btn" class="btn btn-secondary">📥 Restore from Backup</button>
+              <button id="clear-data-btn" class="btn btn-danger">🗑️ Clear All Data</button>
+            </div>
+          </section>
+        </main>
+      </div>
+    `;
+
+    document.body.innerHTML = html;
+  }
+
+  setupEventListeners() {
+    // Navigation
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
+    });
+
+    // Keywords
+    document.getElementById('research-btn')?.addEventListener('click', () => this.researchKeywords());
+    
+    // Analyzer
+    document.getElementById('analyze-btn')?.addEventListener('click', () => this.analyzeContent());
+    
+    // Generator
+    document.getElementById('generate-article-btn')?.addEventListener('click', () => this.generateArticle());
+    
+    // Competitors
+    document.getElementById('analyze-competitor-btn')?.addEventListener('click', () => this.analyzeCompetitor());
+    
+    // Schema
+    document.getElementById('generate-schema-btn')?.addEventListener('click', () => this.generateSchema());
+    
+    // Settings
+    document.getElementById('activate-license-btn')?.addEventListener('click', () => this.toggleLicenseInput());
+    document.getElementById('submit-license-btn')?.addEventListener('click', () => this.submitLicense());
+    document.getElementById('export-data-btn')?.addEventListener('click', () => this.exportData());
+    document.getElementById('create-backup-btn')?.addEventListener('click', () => this.createBackup());
+    document.getElementById('restore-backup-btn')?.addEventListener('click', () => this.restoreBackup());
+    document.getElementById('clear-data-btn')?.addEventListener('click', () => this.clearAllData());
+  }
+
+  // =========================================================================
+  // NAVIGATION
+  // =========================================================================
+  switchTab(tabName) {
+    this.state.currentTab = tabName;
+    
+    // Update nav buttons
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tabName);
+    });
+    
+    // Update tab content
+    document.querySelectorAll('.tab-content').forEach(tab => {
+      tab.classList.toggle('active', tab.id === `${tabName}-tab`);
+    });
+    
+    this.saveState();
+  }
+
+  // =========================================================================
+  // KEYWORD RESEARCH
+  // =========================================================================
+  async researchKeywords() {
+    const input = document.getElementById('keyword-input').value.trim();
+    if (!input) return alert('Enter a keyword');
+
+    const resultsDiv = document.getElementById('keyword-results');
+    resultsDiv.innerHTML = '<p>Searching...</p>';
+
+    try {
+      // Simulate Google Autocomplete scraping
+      const keywords = await this.getGoogleAutocomplete(input);
+      
+      // Store in state
+      keywords.forEach(kw => {
+        if (!this.state.keywords.find(k => k.keyword === kw)) {
+          this.state.keywords.push({
+            keyword: kw,
+            volume: Math.floor(Math.random() * 10000) + 100,
+            difficulty: Math.floor(Math.random() * 100),
+            addedDate: new Date().toLocaleDateString(),
+          });
+        }
+      });
+
+      this.saveState();
+      this.renderKeywordsList();
+      resultsDiv.innerHTML = `<p>✅ Found ${keywords.length} keywords. Added to list.</p>`;
+    } catch (err) {
+      resultsDiv.innerHTML = `<p>⚠️ Error: ${err.message}</p>`;
+    }
+  }
+
+  async getGoogleAutocomplete(query) {
+    // In real usage, you'd call the Google Suggestions API
+    // For now, return simulated results
+    const suggestions = [
+      `${query} for startups`,
+      `${query} for small business`,
+      `${query} free`,
+      `${query} alternatives`,
+      `${query} pricing`,
+      `${query} best`,
+      `${query} 2024`,
+      `${query} vs`,
+    ];
+    return suggestions;
+  }
+
+  renderKeywordsList() {
+    const list = document.getElementById('keywords-list');
+    if (this.state.keywords.length === 0) {
+      list.innerHTML = '<p>No keywords yet. Start researching!</p>';
+      return;
+    }
+
+    list.innerHTML = `
+      <table>
+        <tr>
+          <th>Keyword</th>
+          <th>Volume</th>
+          <th>Difficulty</th>
+          <th>Date Added</th>
+          <th>Action</th>
+        </tr>
+        ${this.state.keywords.map((kw, i) => `
+          <tr>
+            <td>${kw.keyword}</td>
+            <td>${kw.volume.toLocaleString()}</td>
+            <td>${kw.difficulty}</td>
+            <td>${kw.addedDate}</td>
+            <td><button onclick="app.removeKeyword(${i})" class="btn btn-small">Remove</button></td>
+          </tr>
+        `).join('')}
+      </table>
+    `;
+  }
+
+  removeKeyword(index) {
+    this.state.keywords.splice(index, 1);
+    this.saveState();
+    this.renderKeywordsList();
+  }
+
+  // =========================================================================
+  // ON-PAGE SEO ANALYSIS
+  // =========================================================================
+  async analyzeContent() {
+    const input = document.getElementById('analyze-input').value.trim();
+    if (!input) return alert('Enter URL or HTML');
+
+    const resultsDiv = document.getElementById('analysis-results');
+    resultsDiv.innerHTML = '<p>Analyzing...</p>';
+
+    try {
+      let html = input;
+      
+      // If it's a URL, fetch it
+      if (input.startsWith('http')) {
+        const response = await fetch(input);
+        html = await response.text();
+      }
+
+      const analysis = this.analyzeHTML(html);
+      
+      resultsDiv.innerHTML = `
+        <div class="analysis-result">
+          <h3>SEO Analysis Results</h3>
+          <p><strong>Title:</strong> ${analysis.title || '❌ Missing'} (Optimal: 50-60 chars)</p>
+          <p><strong>Meta Description:</strong> ${analysis.metaDesc || '❌ Missing'} (Optimal: 150-160 chars)</p>
+          <p><strong>H1 Tags:</strong> ${analysis.h1Count} (Should be 1)</p>
+          <p><strong>Images:</strong> ${analysis.imageCount} (with alt: ${analysis.altCount})</p>
+          <p><strong>Internal Links:</strong> ${analysis.internalLinks}</p>
+          <p><strong>External Links:</strong> ${analysis.externalLinks}</p>
+          <p><strong>Word Count:</strong> ${analysis.wordCount}</p>
+          <p><strong>Readability:</strong> ${analysis.readability}</p>
+          <hr>
+          <p><strong>Score:</strong> ${analysis.score}/100</p>
+          <p><strong>Recommendations:</strong></p>
+          <ul>${analysis.recommendations.map(r => `<li>${r}</li>`).join('')}</ul>
+        </div>
+      `;
+
+      // Store article
+      this.state.articles.push({
+        url: input.startsWith('http') ? input : 'Local HTML',
+        title: analysis.title,
+        score: analysis.score,
+        analyzedDate: new Date().toLocaleDateString(),
+      });
+      this.saveState();
+    } catch (err) {
+      resultsDiv.innerHTML = `<p>⚠️ Error: ${err.message}</p>`;
+    }
+  }
+
+  analyzeHTML(html) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    const title = doc.querySelector('title')?.textContent || '';
+    const metaDesc = doc.querySelector('meta[name="description"]')?.getAttribute('content') || '';
+    const h1Count = doc.querySelectorAll('h1').length;
+    const imageCount = doc.querySelectorAll('img').length;
+    const altCount = doc.querySelectorAll('img[alt]').length;
+    const internalLinks = doc.querySelectorAll('a[href*="/"]').length;
+    const externalLinks = doc.querySelectorAll('a[target="_blank"]').length;
+    const text = doc.body.innerText;
+    const wordCount = text.split(/\s+/).length;
+    const readability = this.calculateReadability(text);
+
+    let score = 100;
+    const recommendations = [];
+
+    if (!title) { score -= 10; recommendations.push('❌ Add a title tag'); }
+    if (title.length < 30 || title.length > 60) { score -= 5; recommendations.push('⚠️ Title should be 30-60 characters'); }
+    if (!metaDesc) { score -= 10; recommendations.push('❌ Add a meta description'); }
+    if (metaDesc.length < 120 || metaDesc.length > 160) { score -= 5; recommendations.push('⚠️ Meta description should be 120-160 characters'); }
+    if (h1Count !== 1) { score -= 10; recommendations.push('❌ Use exactly one H1 tag'); }
+    if (imageCount > 0 && altCount < imageCount * 0.8) { score -= 5; recommendations.push('⚠️ Add alt text to all images'); }
+    if (wordCount < 300) { score -= 5; recommendations.push('⚠️ Content should be at least 300 words'); }
+    if (readability < 50) { score -= 5; recommendations.push('⚠️ Improve readability'); }
+
+    if (recommendations.length === 0) recommendations.push('✅ Great job! Keep it up.');
+
+    return {
+      title,
+      metaDesc,
+      h1Count,
+      imageCount,
+      altCount,
+      internalLinks,
+      externalLinks,
+      wordCount,
+      readability,
+      score: Math.max(0, score),
+      recommendations,
+    };
+  }
+
+  calculateReadability(text) {
+    const sentences = text.split(/[.!?]+/).length;
+    const words = text.split(/\s+/).length;
+    const avgWordLength = text.replace(/\s/g, '').length / words;
+    
+    // Flesch Reading Ease simplified
+    const readability = 206.835 - (1.015 * (words / sentences)) - (84.6 * (avgWordLength / 5));
+    return Math.max(0, Math.min(100, readability));
+  }
+
+  // =========================================================================
+  // AI ARTICLE GENERATOR
+  // =========================================================================
+  async generateArticle() {
+    const topic = document.getElementById('article-topic').value.trim();
+    const length = document.getElementById('article-length').value;
+    
+    if (!topic) return alert('Enter a topic');
+
+    const outputDiv = document.getElementById('article-output');
+    outputDiv.innerHTML = '<p>📝 Generating article... This may take a moment.</p>';
+
+    try {
+      // Simulate article generation (in real usage, use WebLLM)
+      const article = this.generateMockArticle(topic, parseInt(length));
+      
+      outputDiv.innerHTML = `
+        <div class="article-output">
+          <h3>${article.title}</h3>
+          <p class="meta">By SEOEngine | ${new Date().toLocaleDateString()}</p>
+          <hr>
+          ${article.content}
+          <hr>
+          <button class="btn btn-secondary" onclick="app.copyToClipboard('${article.content.replace(/'/g, "\\'")}')">📋 Copy to Clipboard</button>
+          <button class="btn btn-secondary" onclick="app.downloadAsHTML('${article.title}', '${article.content.replace(/'/g, "\\'")}')" >💾 Download as HTML</button>
+        </div>
+      `;
+    } catch (err) {
+      outputDiv.innerHTML = `<p>⚠️ Error: ${err.message}</p>`;
+    }
+  }
+
+  generateMockArticle(topic, length) {
+    const titles = [
+      `The Complete Guide to ${topic}`,
+      `${topic}: Everything You Need to Know in 2024`,
+      `How to Master ${topic} [Full Tutorial]`,
+      `${topic} for Beginners: A Step-by-Step Guide`,
+      `Top 10 Tips for ${topic}`,
+    ];
+
+    const title = titles[Math.floor(Math.random() * titles.length)];
+    
+    const intro = `<p><strong>Introduction:</strong> ${topic} is becoming increasingly important in today's digital landscape. Whether you're a beginner or an experienced professional, understanding ${topic} can help you achieve better results. In this comprehensive guide, we'll explore everything you need to know about ${topic}.</p>`;
+    
+    const sections = [
+      `<h2>What is ${topic}?</h2><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. This is a fundamental question that many people ask when they first encounter ${topic}.</p>`,
+      `<h2>Why ${topic} Matters</h2><p>In today's competitive landscape, ${topic} is more important than ever. It can help you...</p>`,
+      `<h2>How to Get Started with ${topic}</h2><p>Getting started is easier than you might think. Follow these steps...</p>`,
+      `<h2>Best Practices for ${topic}</h2><p>To get the most out of ${topic}, consider these best practices...</p>`,
+      `<h2>Common Mistakes to Avoid</h2><p>Many people make mistakes when it comes to ${topic}. Here are the most common ones...</p>`,
+    ];
+
+    const conclusion = `<h2>Conclusion</h2><p>We've covered a lot about ${topic} in this guide. The key takeaway is that with the right approach and tools, anyone can master ${topic}. Start implementing these strategies today!</p>`;
+
+    const content = intro + sections.slice(0, Math.ceil(length / 250)).join('') + conclusion;
+
+    return { title, content };
+  }
+
+  copyToClipboard(text) {
+    navigator.clipboard.writeText(text);
+    alert('✅ Copied to clipboard!');
+  }
+
+  downloadAsHTML(title, content) {
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${title}</title>
+  <style>
+    body { font-family: Georgia, serif; max-width: 800px; margin: 40px auto; line-height: 1.6; }
+    h1, h2 { color: #333; }
+  </style>
+</head>
+<body>
+  <h1>${title}</h1>
+  ${content}
+</body>
+</html>`;
+    
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title.replace(/\s+/g, '-').toLowerCase()}.html`;
+    a.click();
+  }
+
+  // =========================================================================
+  // COMPETITOR ANALYSIS
+  // =========================================================================
+  async analyzeCompetitor() {
+    const url = document.getElementById('competitor-url').value.trim();
+    if (!url) return alert('Enter competitor URL');
+
+    const resultsDiv = document.getElementById('competitor-results');
+    resultsDiv.innerHTML = '<p>Analyzing...</p>';
+
+    try {
+      const response = await fetch(url);
+      const html = await response.text();
+      const analysis = this.analyzeHTML(html);
+
+      resultsDiv.innerHTML = `
+        <div class="competitor-analysis">
+          <h3>Competitor Analysis: ${url}</h3>
+          <p><strong>Title:</strong> ${analysis.title}</p>
+          <p><strong>Meta Description:</strong> ${analysis.metaDesc}</p>
+          <p><strong>Word Count:</strong> ${analysis.wordCount}</p>
+          <p><strong>SEO Score:</strong> ${analysis.score}/100</p>
+          <p><strong>H1 Tags:</strong> ${analysis.h1Count}</p>
+          <p><strong>Images:</strong> ${analysis.imageCount}</p>
+          <p><strong>Internal Links:</strong> ${analysis.internalLinks}</p>
+          <p><strong>External Links:</strong> ${analysis.externalLinks}</p>
+        </div>
+      `;
+
+      this.state.competitors.push({
+        url,
+        title: analysis.title,
+        score: analysis.score,
+        wordCount: analysis.wordCount,
+        analyzedDate: new Date().toLocaleDateString(),
+      });
+      this.saveState();
+    } catch (err) {
+      resultsDiv.innerHTML = `<p>⚠️ CORS Error: Cannot fetch external URLs. Try pasting HTML instead.</p>`;
+    }
+  }
+
+  // =========================================================================
+  // SCHEMA GENERATOR
+  // =========================================================================
+  generateSchema() {
+    const schemaType = document.getElementById('schema-type').value;
+    const title = document.getElementById('schema-title').value;
+    const desc = document.getElementById('schema-desc').value;
+
+    if (!title || !desc) return alert('Fill in all fields');
+
+    const schema = this.buildSchema(schemaType, title, desc);
+    const outputDiv = document.getElementById('schema-output');
+
+    outputDiv.innerHTML = `
+      <div class="schema-output">
+        <h3>Generated Schema (JSON-LD)</h3>
+        <pre>${JSON.stringify(schema, null, 2)}</pre>
+        <button class="btn btn-secondary" onclick="app.copyCode(this.previousElementSibling.innerText)">📋 Copy Schema</button>
+      </div>
+    `;
+  }
+
+  buildSchema(type, title, desc) {
+    const baseSchema = {
+      '@context': 'https://schema.org',
+      '@type': type.charAt(0).toUpperCase() + type.slice(1),
+      'name': title,
+      'description': desc,
+      'datePublished': new Date().toISOString().split('T')[0],
+      'author': {
+        '@type': 'Person',
+        'name': 'Your Name',
+      },
+    };
+
+    if (type === 'article') {
+      baseSchema.articleBody = desc;
+      baseSchema.wordCount = desc.split(/\s+/).length;
+    } else if (type === 'product') {
+      baseSchema.offers = {
+        '@type': 'Offer',
+        'price': '99.99',
+        'priceCurrency': 'USD',
+      };
+    } else if (type === 'faq') {
+      baseSchema.mainEntity = [
+        {
+          '@type': 'Question',
+          'name': 'Example question?',
+          'acceptedAnswer': { '@type': 'Answer', 'text': desc },
+        },
+      ];
+    }
+
+    return baseSchema;
+  }
+
+  copyCode(code) {
+    navigator.clipboard.writeText(code);
+    alert('✅ Schema copied!');
+  }
+
+  // =========================================================================
+  // LICENSE MANAGEMENT
+  // =========================================================================
+  toggleLicenseInput() {
+    const input = document.getElementById('license-key');
+    const btn = document.getElementById('submit-license-btn');
+    input.style.display = input.style.display === 'none' ? 'block' : 'none';
+    btn.style.display = btn.style.display === 'none' ? 'block' : 'none';
+  }
+
+  submitLicense() {
+    const key = document.getElementById('license-key').value.trim();
+    if (!key) return alert('Enter a license key');
+
+    // Simulate license validation
+    if (key.length >= 20) {
+      this.state.license = {
+        key,
+        activated: true,
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+      };
+      this.saveState();
+      alert('✅ License activated!');
+      this.updateLicenseStatus();
+    } else {
+      alert('❌ Invalid license key');
+    }
+  }
+
+  updateLicenseStatus() {
+    const statusDiv = document.getElementById('license-status');
+    if (this.state.license && this.state.license.activated) {
+      statusDiv.innerHTML = `<p>✅ License Active</p><p>Expires: ${this.state.license.expiresAt}</p>`;
+    } else {
+      statusDiv.innerHTML = '<p>❌ No active license. Click "Activate License" to add one.</p>';
+    }
+  }
+
+  // =========================================================================
+  // DATA MANAGEMENT
+  // =========================================================================
+  exportData() {
+    const data = {
+      keywords: this.state.keywords,
+      articles: this.state.articles,
+      competitors: this.state.competitors,
+      exportedAt: new Date().toISOString(),
+    };
+
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `seoengine-export-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    alert('✅ Data exported!');
+  }
+
+  createBackup() {
+    const backup = {
+      data: { ...this.state },
+      createdAt: new Date().toISOString(),
+    };
+    this.state.backups.push(backup);
+    this.saveState();
+    alert(`✅ Backup created at ${new Date().toLocaleString()}`);
+  }
+
+  restoreBackup() {
+    if (this.state.backups.length === 0) return alert('No backups available');
+    
+    const backup = this.state.backups[this.state.backups.length - 1];
+    this.state = { ...backup.data };
+    this.saveState();
+    alert(`✅ Restored backup from ${backup.createdAt}`);
+    this.render();
+  }
+
+  clearAllData() {
+    if (confirm('Are you sure? This will delete ALL data. This cannot be undone.')) {
+      this.state = {
+        currentTab: 'home',
+        keywords: [],
+        articles: [],
+        competitors: [],
+        license: null,
+        backups: [],
+      };
+      this.saveState();
+      alert('✅ All data cleared');
+      this.render();
+    }
+  }
+
+  // =========================================================================
+  // STATE MANAGEMENT
+  // =========================================================================
+  saveState() {
+    localStorage.setItem('seoengine-state', JSON.stringify(this.state));
+  }
+
+  loadState() {
+    const saved = localStorage.getItem('seoengine-state');
+    if (saved) {
+      try {
+        this.state = JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to load state');
+      }
+    }
+  }
+
+  loadLicense() {
+    const saved = localStorage.getItem('seoengine-license');
+    return saved ? JSON.parse(saved) : null;
+  }
+
+  render() {
+    this.setupDOM();
+    this.setupEventListeners();
+    this.switchTab(this.state.currentTab);
+    this.renderKeywordsList();
+    this.updateLicenseStatus();
+  }
+}
+
+// ============================================================================
+// Initialize the app
+// ============================================================================
+const app = new SEOEngine();
+</script>
